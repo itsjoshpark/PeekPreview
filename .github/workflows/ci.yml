@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Xcode Version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Lint Swift using swift-format
+        run: xcrun swift-format lint -s -p -r PeekPreview/
+
+      - name: Check extension JavaScript and JSON
+        run: |
+          set -euo pipefail
+          find Extension -name '*.js' -print0 | xargs -0 -n1 node --check
+          for json in Extension/manifest.json Extension/_locales/*/messages.json; do
+            python3 -m json.tool "$json" >/dev/null || { echo "::error file=$json::Invalid JSON"; exit 1; }
+          done
+
+  test:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run extension tests
+        run: node --test tests/*.test.js
+
+      - name: Run script tests
+        run: |
+          failures=0
+          for test in scripts/*.test.sh; do
+            echo "==> $test"
+            "$test" || failures=$((failures + 1))
+          done
+          exit "$failures"
+
+  build:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Xcode Version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build and Analyze
+        run: >
+          xcodebuild clean analyze build
+          -project PeekPreview/PeekPreview.xcodeproj
+          -scheme PeekPreview
+          -configuration Debug
+          -destination "platform=macOS"
+          -derivedDataPath "$RUNNER_TEMP/DerivedData"
+          DEVELOPMENT_TEAM=
+          CODE_SIGN_IDENTITY="-"
+          CODE_SIGNING_REQUIRED=YES
+          CODE_SIGNING_ALLOWED=YES | xcpretty && exit ${PIPESTATUS[0]}
+
+      # Xcode flattens synchronized subfolders; Safari needs these exact paths.
+      - name: Verify extension bundle layout
+        run: |
+          set -euo pipefail
+          resources="$RUNNER_TEMP/DerivedData/Build/Products/Debug/PeekPreview.app/Contents/PlugIns/PeekPreview Extension.appex/Contents/Resources"
+          for path in manifest.json background.js content.js frame.html lib/peek-core.js static/close.svg images/icon-128.png _locales/en/messages.json; do
+            [[ -f "$resources/$path" ]] || { echo "::error::Missing $path in the extension bundle"; exit 1; }
+          done
+          if [[ -e "$resources/peek-core.js" ]]; then
+            echo "::error::lib/peek-core.js was also copied to the bundle root — add it to membershipExceptions"
+            exit 1
+          fi
+          echo "Extension bundle layout OK"

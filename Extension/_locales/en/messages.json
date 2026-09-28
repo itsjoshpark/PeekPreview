@@ -1,0 +1,10 @@
+{
+  "extension_name": {
+    "message": "PeekPreview",
+    "description": "The display name for the extension."
+  },
+  "extension_description": {
+    "message": "Preview links in an overlay with Shift+Click, without leaving the page.",
+    "description": "Description of what the extension does."
+  }
+}
