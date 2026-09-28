@@ -1,7 +1,10 @@
-# PeekPreview
+<p align="center">
+<img height="256" src="Extension/images/icon-256.png" alt="PeekPreview icon">
+</p>
 
-Preview links in an overlay with **Shift+Click** in Safari, without leaving the page — a Safari port
-of [BerryPeek](https://github.com/Kain-90/BerryPeek), inspired by Arc's Peek.
+<h1 align="center">PeekPreview</h1>
+
+Preview links in an overlay with **Shift+Click** in Safari, without leaving the page — inspired by Arc's Peek.
 
 Requires **Safari 27** or later (macOS 15 Sequoia or later).
 
