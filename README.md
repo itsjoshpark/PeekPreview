@@ -37,9 +37,31 @@ Requires **Safari 27** or later (macOS 15 Sequoia or later).
 
 ```sh
 node --test tests/*.test.js      # unit tests
+for t in scripts/*.test.sh; do "$t"; done   # release script tests
+xcrun swift-format lint -s -p -r PeekPreview/   # Swift lint (CI runs this)
 scripts/export-icons.sh          # after editing AppIcon.icon: re-export the extension PNGs
 xcodebuild -project PeekPreview/PeekPreview.xcodeproj -scheme PeekPreview build
 ```
+
+## Releasing
+
+CI (`.github/workflows/ci.yml`) lints, tests, and builds every push to `main` and every pull request.
+
+To ship a version to the App Store:
+
+1. Write the release notes in `release-notes/next.md` (start from `release-notes/TEMPLATE.md`) and
+   merge to `main`.
+2. Actions → **🚀 Release** → choose patch / minor / major. Run it once with **dry run** checked
+   first: it archives, signs, and exports the `.pkg` without uploading anything.
+3. The workflow bumps the version (`Config/Shared.xcconfig` and `Extension/manifest.json`),
+   uploads the build to App Store Connect, tags `vX.Y.Z`, creates a GitHub release with the notes,
+   and commits the new version back to `main`.
+4. In App Store Connect, add the "What's New" text and submit the build for review.
+
+One-time setup: repository secrets `AC_API_KEY_P8_BASE64`, `AC_API_KEY_ID`, `AC_API_ISSUER_ID`
+(an App Store Connect API key with the Admin role, used for cloud-managed signing), and an app
+record for `dev.joshuapark.PeekPreview` in App Store Connect. Details are at the top of
+`.github/workflows/release.yml`.
 
 ## Notes
 

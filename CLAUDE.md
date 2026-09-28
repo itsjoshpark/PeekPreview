@@ -20,11 +20,18 @@ macOS Safari Web Extension (MV3) that opens Shift+Clicked links in a peek overla
 - `Config/Shared.xcconfig` — bundle ID prefix, team, deployment target, version; overridden by
   git-ignored `Config/Local.xcconfig`.
 - `tests/` — Node tests: `peek-core.js` logic and the Xcode project's `Extension/` wiring.
+- `scripts/` — `export-icons.sh`; release helpers `bump-version.sh` and `project-version.sh`, each
+  with a `.test.sh`.
+- `.github/workflows/` — `ci.yml` (lint, tests, build + bundle-layout check) and `release.yml`
+  (manual: archive, cloud-signed export, App Store Connect upload, tag, GitHub release).
+- `release-notes/` — `next.md` is published by the next release, then archived as `<version>.md`.
 
 ## Commands
 
 ```sh
 node --test tests/*.test.js
+for t in scripts/*.test.sh; do "$t"; done
+xcrun swift-format lint -s -p -r PeekPreview/   # uses .swift-format; `format -i -r` to fix
 xcodebuild -project PeekPreview/PeekPreview.xcodeproj -scheme PeekPreview build
 scripts/export-icons.sh   # re-render Extension/images/*.png and the app's Icon.png from AppIcon.icon
 ```
@@ -50,6 +57,9 @@ scripts/export-icons.sh   # re-render Extension/images/*.png and the app's Icon.
   the `Extension` folder's `membershipExceptions` in `project.pbxproj` (`tests/project.test.js`
   fails until it is). A new subfolder needs a folder reference plus exceptions, or Safari won't
   find its files. Web-accessible files also need an entry in `manifest.json`.
+- The version lives in both `Config/Shared.xcconfig` (`MARKETING_VERSION`) and
+  `Extension/manifest.json` (`version`) and must match; the release workflow bumps both via
+  `scripts/project-version.sh`. Don't bump versions by hand.
 - Put testable logic in `peek-core.js` with a test in `tests/`.
 - Keep the BerryPeek MIT notice in `THIRD_PARTY_NOTICES.md`.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/):

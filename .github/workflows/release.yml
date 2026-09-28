@@ -1,0 +1,324 @@
+# Description:
+# Builds, signs, and uploads a new version to App Store Connect, then tags it and
+# publishes a GitHub release with the notes. Triggered manually from the Actions tab.
+#         1. Write release notes to release-notes/next.md beforehand
+#         2. Choose release type (major, minor, patch); try a dry run first
+#
+# After the upload the build appears in App Store Connect (and TestFlight) once
+# processing finishes; submitting it for review — and the App Store "What's New"
+# text — is done there.
+#
+# The marketing version is read from Config/Shared.xcconfig (which must match
+# Extension/manifest.json) and bumped by the chosen amount; the build number is
+# the commit count and is never read back as input. Both are written into the
+# runner's copy before archiving, then committed back to main after the release.
+#
+# Nothing outside the runner is touched until the upload step, and a dry run
+# stops before it: it archives, signs, and exports the .pkg as an artifact only.
+#
+# If a run fails after the upload, re-running reuses the same build number and
+# App Store Connect rejects it. Land any commit on main (which bumps the count)
+# and run again.
+#
+# 🚨 GITHUB SECRETS REQUIRED:
+#         - AC_API_KEY_P8_BASE64: App Store Connect API key (.p8), base64 encoded:
+#           `base64 -i AuthKey_XXXX.p8 | pbcopy`. The key needs the Admin role so
+#           Xcode can use cloud-managed signing certificates.
+#         - AC_API_KEY_ID / AC_API_ISSUER_ID: shown alongside the key
+#
+# The app record for dev.joshuapark.PeekPreview must exist in App Store Connect
+# before the first upload.
+
+name: 🚀 Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-type:
+        type: choice
+        description: "Choose release type: major, minor, patch"
+        required: true
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      dry-run:
+        type: boolean
+        description: "Archive and export only — no upload, tag, or release"
+        required: false
+        default: false
+
+# Two runs would resolve the same tag and build number, then collide at upload.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: macos-26
+    permissions:
+      contents: write
+    env:
+      TEAM_ID: TCQ6328PP6
+      XCCONFIG: Config/Shared.xcconfig
+      MANIFEST: Extension/manifest.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # A shallow clone makes `git rev-list --count` return 1, which is below
+          # every build number already uploaded.
+          fetch-depth: 0
+
+      - name: Setup Xcode Version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # The runner context is unavailable in job-level env, so these are set here.
+      - name: Set build paths
+        run: |
+          set -euo pipefail
+          {
+            echo "ARCHIVE_PATH=$RUNNER_TEMP/build/PeekPreview.xcarchive"
+            echo "EXPORT_PATH=$RUNNER_TEMP/build/export"
+            echo "DERIVED_DATA=$RUNNER_TEMP/build/DerivedData"
+          } >>"$GITHUB_ENV"
+
+      # Before anything depends on these scripts.
+      - name: Verify tests pass
+        run: |
+          set -euo pipefail
+          for test in scripts/*.test.sh; do "$test"; done
+          node --test tests/*.test.js
+
+      # Everything below the build is expensive; fail here instead.
+      - name: Resolve version and build number
+        id: version
+        run: |
+          set -euo pipefail
+
+          # The version bump is committed back to main; releasing from anywhere
+          # else would strand it on a side branch.
+          if [[ "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "::error::Releases must be run from main, not $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+          current="$(./scripts/project-version.sh read "$XCCONFIG" "$MANIFEST")"
+          version="$(./scripts/bump-version.sh "$current" "${{ inputs.release-type }}")"
+          build="$(git rev-list --count HEAD)"
+
+          if git rev-parse "v$version" >/dev/null 2>&1; then
+            echo "::error::Tag v$version already exists"
+            exit 1
+          fi
+
+          notes="release-notes/next.md"
+          if [[ ! -f "$notes" ]]; then
+            echo "::error::Missing $notes. Copy release-notes/TEMPLATE.md to it and write the release notes."
+            exit 1
+          fi
+          if cmp -s "$notes" release-notes/TEMPLATE.md; then
+            echo "::error::$notes is still the unedited template. Write the release notes before releasing."
+            exit 1
+          fi
+          if [[ -e "release-notes/$version.md" ]]; then
+            echo "::error::release-notes/$version.md already exists, so the archived notes for this release would be overwritten."
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "build=$build"
+            echo "notes=$notes"
+          } >>"$GITHUB_OUTPUT"
+
+          echo "Releasing $version ($build), bumped from $current"
+
+      - name: Prepare App Store Connect API key
+        env:
+          AC_API_KEY_P8_BASE64: ${{ secrets.AC_API_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$AC_API_KEY_P8_BASE64" | base64 --decode >"$key"
+          chmod 600 "$key"
+          [[ -s "$key" ]] || { echo "::error::AC_API_KEY_P8_BASE64 decoded to an empty file"; exit 1; }
+          echo "AC_KEY_PATH=$key" >>"$GITHUB_ENV"
+
+      # Cheap check, before the build.
+      - name: Preflight — verify the API key
+        env:
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if ! xcrun notarytool history \
+            --key "$AC_KEY_PATH" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" \
+            >/dev/null 2>&1; then
+            echo "::error::The App Store Connect API key was rejected. Check AC_API_KEY_P8_BASE64, AC_API_KEY_ID, and AC_API_ISSUER_ID, and that the key has not been revoked."
+            exit 1
+          fi
+          echo "App Store Connect API key accepted"
+
+      # Only in the runner's checkout until the release is published.
+      - name: Stamp the version
+        run: |
+          ./scripts/project-version.sh write "$XCCONFIG" "$MANIFEST" \
+            "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.build }}"
+
+      - name: Archive
+        env:
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project PeekPreview/PeekPreview.xcodeproj \
+            -scheme PeekPreview \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -archivePath "$ARCHIVE_PATH" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$AC_KEY_PATH" \
+            -authenticationKeyID "$AC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$AC_API_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic
+
+      - name: Export archive
+        env:
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist .github/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$AC_KEY_PATH" \
+            -authenticationKeyID "$AC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$AC_API_ISSUER_ID"
+
+      - name: Verify the exported package
+        id: package
+        run: |
+          set -euo pipefail
+          pkg="$(find "$EXPORT_PATH" -maxdepth 1 -name '*.pkg' | head -1)"
+          [[ -n "$pkg" ]] || { echo "::error::No .pkg in $EXPORT_PATH"; ls -la "$EXPORT_PATH"; exit 1; }
+
+          pkgutil --check-signature "$pkg"
+          pkgutil --check-signature "$pkg" | grep -q "3rd Party Mac Developer Installer" ||
+            { echo "::error::The package is not signed with a Mac Installer Distribution certificate"; exit 1; }
+
+          expanded="$RUNNER_TEMP/build/expanded"
+          rm -rf "$expanded"
+          pkgutil --expand-full "$pkg" "$expanded"
+          app="$(find "$expanded" -name PeekPreview.app -type d -prune | head -1)"
+          [[ -n "$app" ]] || { echo "::error::PeekPreview.app not found in the package"; exit 1; }
+          appex="$app/Contents/PlugIns/PeekPreview Extension.appex"
+
+          want_version="${{ steps.version.outputs.version }}"
+          want_build="${{ steps.version.outputs.build }}"
+          for bundle in "$app" "$appex"; do
+            version="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$bundle/Contents/Info.plist")"
+            build="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$bundle/Contents/Info.plist")"
+            [[ "$version" == "$want_version" && "$build" == "$want_build" ]] ||
+              { echo "::error::$(basename "$bundle") is $version ($build), expected $want_version ($want_build)"; exit 1; }
+          done
+          manifest_version="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$appex/Contents/Resources/manifest.json")"
+          [[ "$manifest_version" == "$want_version" ]] ||
+            { echo "::error::Extension manifest is $manifest_version, expected $want_version"; exit 1; }
+
+          authority="$(codesign -dvvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+          case "$authority" in
+            "Apple Distribution"* | "3rd Party Mac Developer Application"*) ;;
+            *) echo "::error::App signed by '$authority', expected an Apple Distribution certificate"; exit 1 ;;
+          esac
+
+          echo "pkg=$pkg" >>"$GITHUB_OUTPUT"
+          echo "Verified $want_version ($want_build), signed by: $authority"
+
+      - name: Upload package as an artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: PeekPreview_v${{ steps.version.outputs.version }}.pkg
+          path: ${{ steps.package.outputs.pkg }}
+
+      # ---- Nothing above this line changes anything outside the runner. ----
+
+      - name: Upload to App Store Connect
+        if: ${{ !inputs.dry-run }}
+        env:
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          options="$RUNNER_TEMP/ExportOptions-upload.plist"
+          cp .github/ExportOptions.plist "$options"
+          /usr/libexec/PlistBuddy -c "Set :destination upload" "$options"
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$RUNNER_TEMP/build/upload" \
+            -exportOptionsPlist "$options" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$AC_KEY_PATH" \
+            -authenticationKeyID "$AC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$AC_API_ISSUER_ID"
+
+      - name: Remove the API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Tag and create the GitHub release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          version="${{ steps.version.outputs.version }}"
+          git tag "v$version"
+          git push origin "v$version"
+
+          gh release create "v$version" \
+            --title "v$version" \
+            --notes-file "${{ steps.version.outputs.notes }}"
+
+      - name: Record the version on main
+        if: ${{ !inputs.dry-run }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+
+          # Archive the notes under the version they shipped as, and leave a
+          # fresh template ready for the next release.
+          git mv release-notes/next.md "release-notes/$version.md"
+          cp release-notes/TEMPLATE.md release-notes/next.md
+
+          git add "$XCCONFIG" "$MANIFEST" release-notes
+          git commit -m "chore: release $version (${{ steps.version.outputs.build }}) [skip ci]"
+
+          # The build is already uploaded, so a rejected push would leave main
+          # reporting the previous version. Rebase onto whatever landed on main
+          # during the run and retry.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt), rebasing onto main"
+            git fetch origin main
+            git rebase origin/main
+          done
+
+          echo "::error::Could not push the version bump after 3 attempts. The build is uploaded and tagged, but $XCCONFIG and $MANIFEST on main still report the previous version."
+          exit 1
