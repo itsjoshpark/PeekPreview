@@ -21,11 +21,11 @@ Requires **Safari 27** or later (macOS 15 Sequoia or later).
 
 1. Optional: copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` and set your
    `DEVELOPMENT_TEAM`.
-2. Open `PeekPreview/PeekPreview.xcodeproj` in Xcode 26.3 or later and run the **PeekPreview**
-   scheme.
-3. In Safari: **Settings → Advanced → Show features for web developers**, then
+2. In Safari: **Settings → Advanced → Show features for web developers**, then
    **Develop → Developer Settings… → Allow unsigned extensions** (only needed for unsigned local
    builds).
+3. Open `PeekPreview/PeekPreview.xcodeproj` in Xcode 26.3 or later and run the **PeekPreview**
+   scheme.
 4. **Safari Settings → Extensions**: turn on PeekPreview and allow it on **All Websites**.
 
 ## Development
