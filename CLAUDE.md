@@ -1,7 +1,6 @@
 # PeekPreview
 
-macOS Safari Web Extension (MV3) that opens Shift+Clicked links in a peek overlay. Port of
-[BerryPeek](https://github.com/Kain-90/BerryPeek) (Chrome, MIT). Targets the Mac App Store.
+macOS Safari Web Extension (MV3) that opens Shift+Clicked links in a peek overlay. Targets the Mac App Store.
 
 ## Layout
 
@@ -16,7 +15,7 @@ macOS Safari Web Extension (MV3) that opens Shift+Clicked links in a peek overla
   - `frame.html/js/css` — extension page that hosts the remote `<iframe>` inside the overlay.
 - `PeekPreview/PeekPreview.xcodeproj` — container app (`PeekPreview/`, WKWebView welcome page) and
   `PeekPreview Extension/` target.
-- `PeekPreview/PeekPreview/AppIcon.icon` — Icon Composer icon (original; never use BerryPeek's icon).
+- `PeekPreview/PeekPreview/AppIcon.icon` — Icon Composer icon.
 - `Config/Shared.xcconfig` — bundle ID prefix, team, deployment target, version; overridden by
   git-ignored `Config/Local.xcconfig`.
 - `tests/` — Node tests: `peek-core.js` logic and the Xcode project's `Extension/` wiring.
@@ -61,7 +60,6 @@ scripts/export-icons.sh   # re-render Extension/images/*.png and the app's Icon.
   `Extension/manifest.json` (`version`) and must match; the release workflow bumps both via
   `scripts/project-version.sh`. Don't bump versions by hand.
 - Put testable logic in `peek-core.js` with a test in `tests/`.
-- Keep the BerryPeek MIT notice in `THIRD_PARTY_NOTICES.md`.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/):
   `type(scope): summary` in the imperative, lower case, no trailing period — types `feat`, `fix`,
   `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`; optional scopes
