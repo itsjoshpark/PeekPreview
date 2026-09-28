@@ -1,0 +1,3 @@
+// Copy to Config/Local.xcconfig (git-ignored) and fill in.
+DEVELOPMENT_TEAM = ABCDE12345
+// PEEK_BUNDLE_ID_PREFIX = dev.joshuapark

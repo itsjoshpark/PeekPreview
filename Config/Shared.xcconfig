@@ -1,0 +1,13 @@
+// Shared build settings for both targets.
+// Put your DEVELOPMENT_TEAM (and any bundle ID override) in Config/Local.xcconfig (git-ignored).
+
+PEEK_BUNDLE_ID_PREFIX = dev.joshuapark
+DEVELOPMENT_TEAM =
+
+// Safari 27 is the minimum; macOS 15 is the oldest macOS that runs it.
+MACOSX_DEPLOYMENT_TARGET = 15.0
+
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+
+#include? "Local.xcconfig"
