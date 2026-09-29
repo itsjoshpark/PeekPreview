@@ -15,7 +15,8 @@ Requires **Safari 27** or later (macOS 15 Sequoia or later).
 - Open in a new tab or close (Esc, or click outside) from the side buttons.
 - Drag the window by its header; resize from any edge or corner.
 - Sites that forbid embedding (GitHub, many news and login-protected sites) open in a peek-sized
-  popup window instead; close it with ⌘W.
+  popup window instead; close it with ⌘W. Sites that only allow embedding by their own pages
+  still open in the overlay when you peek a link on the same site.
 
 ## Build and run
 
