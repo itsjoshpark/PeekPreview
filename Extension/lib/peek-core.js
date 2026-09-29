@@ -8,7 +8,7 @@
 
   // The popup window's size relative to the browser window it opens from: a share of its width,
   // its full height less a fixed gap (split above and below), and its smallest size.
-  const POPUP_SCALE = 0.9;
+  const POPUP_SCALE = 0.8;
   const POPUP_HEIGHT_GAP = 128;
   const POPUP_MIN = { width: 400, height: 300 };
 
