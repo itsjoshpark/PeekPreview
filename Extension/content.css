@@ -31,6 +31,7 @@
   --ring: rgba(150, 130, 255, 0.28);
   --ring-hover: rgba(150, 130, 255, 0.45);
   --accent: rgb(120, 100, 240);
+  --bg-frame: #ffffff;
 
   position: absolute;
   inset: 0;
@@ -60,6 +61,7 @@
   --bg-side-button-hover: rgb(72, 72, 74);
   --ring: rgba(150, 130, 255, 0.3);
   --ring-hover: rgba(150, 130, 255, 0.5);
+  --bg-frame: #1e1e1e;
 }
 
 @keyframes peek-fade-in {
@@ -255,10 +257,11 @@ button:focus-visible {
   background: transparent;
 }
 
-/* A site framed directly (not via frame.html) gets the white backdrop frame.css gives it, once
-   loaded so the spinner behind it stays visible. */
+/* A site framed directly (not via frame.html) gets the themed backdrop frame.css gives it, once
+   loaded so the spinner behind it stays visible. It shows through an always-shown scroll bar's
+   translucent track. */
 .peek-frame-page.peek-frame-loaded {
-  background: #ffffff;
+  background: var(--bg-frame);
 }
 
 /* Side buttons */
