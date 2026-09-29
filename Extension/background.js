@@ -3,8 +3,12 @@
 
 const CHECK_TIMEOUT_MS = 5000;
 
-// `{ headers, url }` for `url` after redirects (`headers` has lower-case keys), or null on a
-// network error or timeout. Reads only the response headers, then aborts the body.
+/**
+ * Fetches `url`'s response headers, then aborts the body.
+ * @param {string} url
+ * @returns {Promise<{ headers: Record<string, string>, url: string } | null>} Headers with
+ *   lower-case keys and the URL after redirects, or null on a network error or timeout.
+ */
 async function fetchHeaders(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
@@ -23,11 +27,18 @@ async function fetchHeaders(url) {
   }
 }
 
-// A site that blocks the extension's frame page can still go straight into the page's overlay
-// when the link is on the page's own origin (before and after redirects), the site accepts the
-// page as its parent, and the page's <meta> CSP (`pageCsp`) lets it frame the link. The page's
-// header CSP isn't re-fetched: the content script checks that the frame loaded and falls back to
-// the popup (`peek:popup`) if it didn't.
+/**
+ * Can a site that blocks the extension's frame page go straight into the page's overlay? Only
+ * when the link is on the page's own origin (before and after redirects), the site accepts the
+ * page as its parent, and the page's <meta> CSP lets it frame the link. The page's header CSP
+ * isn't re-fetched: the content script checks that the frame loaded and falls back to the popup
+ * (`peek:popup`) if it didn't.
+ * @param {{ headers: Record<string, string>, url: string }} target The link's response.
+ * @param {string} url The link as clicked.
+ * @param {string} pageUrl
+ * @param {string} pageCsp The page's <meta> CSP policies, joined with ", ".
+ * @returns {boolean}
+ */
 function canFrameInPage(target, url, pageUrl, pageCsp) {
   if (!PeekCore.isSameOrigin(url, pageUrl) || !PeekCore.isSameOrigin(target.url, pageUrl)) {
     return false;
@@ -44,10 +55,17 @@ function canFrameInPage(target, url, pageUrl, pageCsp) {
 const POPUP_SETTLE_MS = 1500;
 const POPUP_POLL_MS = 100;
 
-// Safari ignores the size passed to windows.create and may resize the window again as it opens.
-// Create it unfocused (behind the current window), keep applying the bounds, and bring it forward
-// once they've held for two checks, so the full-screen flash stays hidden. Keeps enforcing the
-// bounds until POPUP_SETTLE_MS in case Safari resizes it later.
+/**
+ * Opens `url` in a peek-sized popup centered on window `windowId`.
+ *
+ * Safari ignores the size passed to windows.create and may resize the window again as it opens.
+ * Create it unfocused (behind the current window), keep applying the bounds, and bring it forward
+ * once they've held for two checks, so the full-screen flash stays hidden. Keeps enforcing the
+ * bounds until POPUP_SETTLE_MS in case Safari resizes it later.
+ * @param {string} url
+ * @param {number} windowId
+ * @returns {Promise<void>} Resolves once the popup is shown.
+ */
 async function openPopup(url, windowId) {
   const parent = await browser.windows.get(windowId);
   const bounds = PeekCore.popupBounds(parent);
@@ -114,7 +132,13 @@ async function handlePeekOpen(message, sender) {
   return openOutside(message.url, sender);
 }
 
-// For a site that can't be framed: a popup window, or "tab" to have the content script open a tab.
+/**
+ * Opens a site that can't be framed in a popup window.
+ * @param {string} url
+ * @param {browser.runtime.MessageSender} sender
+ * @returns {Promise<{ mode: "popup" | "tab" }>} "tab" when no popup could be opened: the content
+ *   script then opens a tab.
+ */
 async function openOutside(url, sender) {
   if (sender.tab?.windowId !== undefined) {
     try {

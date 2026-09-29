@@ -24,7 +24,10 @@
     return href || "";
   }
 
-  // `path` is event.composedPath(), so links inside open shadow roots are found too.
+  /**
+   * @param {EventTarget[]} path event.composedPath(), so links inside open shadow roots are found.
+   * @returns {Element | null} The first link with an href.
+   */
   function findLink(path) {
     for (const node of path) {
       if (!node || typeof node.tagName !== "string") continue;
@@ -33,7 +36,12 @@
     return null;
   }
 
-  // "overlay": preview it; "tab": open in a new tab instead; "ignore": let the browser handle it.
+  /**
+   * @param {string} url
+   * @param {string} pageUrl
+   * @returns {"overlay" | "tab" | "ignore"} Preview it, open it in a new tab instead, or let the
+   *   browser handle it.
+   */
   function classifyUrl(url, pageUrl) {
     let target;
     try {
@@ -62,10 +70,14 @@
     return url.replace(/^http:/i, "https:");
   }
 
-  // Would these response headers stop the page rendering in the overlay? `headers` has lower-case keys.
-  // The frame's parent is the extension's frame page, never the site itself, so any
-  // X-Frame-Options value (DENY or SAMEORIGIN) and any CSP frame-ancestors directive blocks it.
-  // A blocked link on the page's own origin may still be framed in the page (`allowsParent`).
+  /**
+   * Would these response headers stop the page rendering in the overlay? The frame's parent is
+   * the extension's frame page, never the site itself, so any X-Frame-Options value (DENY or
+   * SAMEORIGIN) and any CSP frame-ancestors directive blocks it. A blocked link on the page's own
+   * origin may still be framed in the page (`allowsParent`).
+   * @param {Record<string, string>} headers Lower-case keys.
+   * @returns {boolean}
+   */
   function blocksFraming(headers) {
     if (headers["x-frame-options"]) return true;
     const csp = headers["content-security-policy"] || "";
@@ -88,8 +100,11 @@
     return first !== null && second !== null && first.origin === second.origin;
   }
 
-  // CSP header value(s) → one Map(directive → sources) per policy. `fetch` joins repeated headers
-  // with ", ", which is also how several policies are written in one value.
+  /**
+   * @param {string} csp CSP header value(s). `fetch` joins repeated headers with ", ", which is
+   *   also how several policies are written in one value.
+   * @returns {Map<string, string[]>[]} Directive (lower case) → sources, one Map per policy.
+   */
   function parsePolicies(csp) {
     return csp
       .split(",")
@@ -114,8 +129,14 @@
 
   const HOST_SOURCE = /^(?:([a-z][a-z0-9+.-]*):\/\/)?(\*|(?:\*\.)?[^/:*]+)(?::(\d+|\*))?(\/.*)?$/i;
 
-  // Does CSP source expression `source` allow `url`? `selfUrl` is the protected resource ('self').
-  // `ignorePath` for frame-ancestors, where browsers match only the ancestor's origin.
+  /**
+   * Does CSP source expression `source` allow `url`?
+   * @param {string} source
+   * @param {string} url
+   * @param {string} selfUrl The protected resource, for 'self' and scheme-less sources.
+   * @param {boolean} [ignorePath] For frame-ancestors, where browsers match only the origin.
+   * @returns {boolean}
+   */
   function matchesSource(source, url, selfUrl, ignorePath = false) {
     const target = parseUrl(url);
     const self = parseUrl(selfUrl);
@@ -156,9 +177,14 @@
     return sources.some((source) => matchesSource(source, url, selfUrl, ignorePath));
   }
 
-  // Would the site at `url` (after redirects), with these response headers, render in a frame
-  // whose only ancestor is `parentUrl`? CSP frame-ancestors, when present, replaces
-  // X-Frame-Options; conflicting X-Frame-Options values block.
+  /**
+   * Would the site render in a frame whose only ancestor is `parentUrl`? CSP frame-ancestors,
+   * when present, replaces X-Frame-Options; conflicting X-Frame-Options values block.
+   * @param {Record<string, string>} headers The site's response headers, lower-case keys.
+   * @param {string} url The site's URL after redirects.
+   * @param {string} parentUrl
+   * @returns {boolean}
+   */
   function allowsParent(headers, url, parentUrl) {
     const ancestors = parsePolicies(headers["content-security-policy"] || "")
       .map((policy) => policy.get("frame-ancestors"))
@@ -178,8 +204,14 @@
     return true;
   }
 
-  // Would the page at `pageUrl`, with CSP `csp` (header and <meta> policies), let `url` load in
-  // an <iframe>? Each policy is checked against frame-src, else child-src, else default-src.
+  /**
+   * Would the page let `url` load in an <iframe>? Each policy is checked against frame-src, else
+   * child-src, else default-src.
+   * @param {string} csp The page's CSP policies, joined with ", ".
+   * @param {string} url
+   * @param {string} pageUrl
+   * @returns {boolean}
+   */
   function allowsFrame(csp, url, pageUrl) {
     return parsePolicies(csp).every((policy) => {
       const sources =
@@ -227,8 +259,17 @@
     };
   }
 
-  // Resize `start` by pointer delta (dx, dy) along the dragged `edges`.
-  // With limits/viewport, the size is clamped and the opposite edge stays anchored.
+  /**
+   * Resize `start` by pointer delta (dx, dy) along the dragged `edges`.
+   * @param {{ left: number, top: number, width: number, height: number }} start
+   * @param {{ top?: boolean, right?: boolean, bottom?: boolean, left?: boolean }} edges
+   * @param {number} dx
+   * @param {number} dy
+   * @param {object} [limits] With `viewport`, the size is clamped and the opposite edge stays
+   *   anchored.
+   * @param {{ width: number, height: number }} [viewport]
+   * @returns {{ left: number, top: number, width: number, height: number }}
+   */
   function resizeRect(start, edges, dx, dy, limits, viewport) {
     let width = start.width + (edges.right ? dx : 0) - (edges.left ? dx : 0);
     let height = start.height + (edges.bottom ? dy : 0) - (edges.top ? dy : 0);

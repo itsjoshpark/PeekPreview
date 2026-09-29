@@ -187,7 +187,11 @@
     container.style.height = `${rect.height}px`;
   }
 
-  // Drag/resize with pointer capture. `onMove(dx, dy, startRect)` returns the new rect.
+  /**
+   * Drag/resize with pointer capture.
+   * @param {HTMLElement} handle
+   * @param {(dx: number, dy: number, startRect: object) => object} onMove Returns the new rect.
+   */
   function trackPointer(handle, onMove) {
     handle.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || !current) return;
@@ -324,9 +328,12 @@
     return { host, shadow, overlay, wrapper, container, body, loading, themeButton, themeMenu };
   }
 
-  // Frames the site through the extension's frame page, which the host page's CSP can't block.
-  // `inPage` frames it directly instead: a same-origin site that only accepts its own pages as
-  // parents would reject the frame page's origin.
+  /**
+   * Frames the site through the extension's frame page, which the host page's CSP can't block.
+   * @param {string} url
+   * @param {boolean} inPage Frame it directly instead, sandboxed: a same-origin site that only
+   *   accepts its own pages as parents would reject the frame page's origin.
+   */
   function mountFrame(url, inPage) {
     if (!current) return;
     let src = url;
@@ -364,8 +371,12 @@
     );
   }
 
-  // Did the same-origin frame load the site? A frame Safari refused holds a blank or error
-  // document, whose location is about:blank or unreadable.
+  /**
+   * Did the same-origin frame load the site? A frame Safari refused holds a blank or error
+   * document, whose location is about:blank or unreadable.
+   * @param {HTMLIFrameElement} frame
+   * @returns {boolean}
+   */
   function inPageLoaded(frame) {
     try {
       return frame.contentWindow.location.href !== "about:blank";
@@ -374,7 +385,10 @@
     }
   }
 
-  // The site wouldn't render in the page after all: open it the way a blocked site opens.
+  /**
+   * The site wouldn't render in the page after all: open it the way a blocked site opens.
+   * @param {object} peek The peek to replace; ignored if it's no longer current.
+   */
   async function fallBackToPopup(peek) {
     if (current !== peek || peek.fellBack) return;
     peek.fellBack = true;
@@ -397,7 +411,6 @@
     const frame = current?.frame;
     if (!frame) return;
     if (current.inPage) {
-      // Reloads the frame's current page, even one with a #fragment (a new src would only scroll).
       try {
         frame.contentWindow.location.reload();
       } catch {
@@ -408,8 +421,11 @@
     }
   }
 
-  // The page's <meta> CSP, which limits what it may frame; the background checks it before
-  // framing a site in the page.
+  /**
+   * The page's <meta> CSP, which limits what it may frame; the background checks it before
+   * framing a site in the page.
+   * @returns {string} The policies, joined with ", ".
+   */
   function metaCsp() {
     return [...document.querySelectorAll('meta[http-equiv="content-security-policy" i]')]
       .map((meta) => meta.content)
