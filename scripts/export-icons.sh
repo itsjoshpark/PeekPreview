@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Renders the Icon Composer icon to the PNGs used by the web extension manifest and the container app.
+# Renders the Icon Composer icon to the PNGs used by the web extension manifest.
 set -euo pipefail
 
 root="${0:A:h:h}"
@@ -18,8 +18,5 @@ for size in 16 32 48 64 96 128 256 512; do
   "$ictool" "$icon" --export-image --output-file "$out/icon-$size.png" \
     --platform macOS --rendition Default --width "$size" --height "$size" --scale 1 >/dev/null
 done
-# Container app's welcome-screen image (shown at 128pt).
-"$ictool" "$icon" --export-image --output-file "$root/PeekPreview/PeekPreview/Resources/Icon.png" \
-  --platform macOS --rendition Default --width 128 --height 128 --scale 2 >/dev/null
 
 echo "Exported $(ls "$out"/icon-*.png | wc -l | tr -d ' ') icons to $out"

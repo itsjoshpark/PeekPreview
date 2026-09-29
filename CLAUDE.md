@@ -13,7 +13,7 @@ macOS Safari Web Extension (MV3) that opens Shift+Clicked links in a peek overla
   - `content.js` / `content.css` — link interception and the overlay (closed shadow root,
     constructed stylesheet, inlined SVG icons, CSS-sized to the viewport).
   - `frame.html/js/css` — extension page that hosts the remote `<iframe>` inside the overlay.
-- `PeekPreview/PeekPreview.xcodeproj` — container app (`PeekPreview/`, WKWebView welcome page) and
+- `PeekPreview/PeekPreview.xcodeproj` — container app (`PeekPreview/`, SwiftUI welcome window) and
   `PeekPreview Extension/` target.
 - `PeekPreview/PeekPreview/AppIcon.icon` — Icon Composer icon.
 - `Config/Shared.xcconfig` — bundle ID prefix, team, deployment target, version; overridden by
@@ -32,7 +32,7 @@ node --test tests/*.test.js
 for t in scripts/*.test.sh; do "$t"; done
 xcrun swift-format lint -s -p -r PeekPreview/   # uses .swift-format; `format -i -r` to fix
 xcodebuild -project PeekPreview/PeekPreview.xcodeproj -scheme PeekPreview build
-scripts/export-icons.sh   # re-render Extension/images/*.png and the app's Icon.png from AppIcon.icon
+scripts/export-icons.sh   # re-render Extension/images/*.png from AppIcon.icon
 ```
 
 ## Rules
