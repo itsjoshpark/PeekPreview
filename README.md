@@ -8,6 +8,8 @@ Preview links in an overlay with **Shift+Click** in Safari, without leaving the 
 
 Requires **Safari 27** or later (macOS 15 Sequoia or later).
 
+![A link previewed in the PeekPreview overlay in Safari](.github/images/screenshot.png)
+
 ## Features
 
 - Shift+Click (or Shift+middle-click) any link to open it in an overlay.
