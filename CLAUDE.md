@@ -77,10 +77,10 @@ scripts/export-icons.sh   # re-render Extension/images/*.png from AppIcon.icon
 ## Manual test checklist (Safari)
 
 Shift+Click a link → overlay, not Reading List · github.com links open a centered popup window
-90% as wide and 128 px shorter than the Safari window · on a site that sends
+80% as wide and 128 px shorter than the Safari window · on a site that sends
 `X-Frame-Options: SAMEORIGIN`, a same-origin link opens in the overlay and a link to another
 subdomain opens in the popup · on tiktok.com (`frame-ancestors` listing `www.tiktok.com`), a
 same-origin link opens in the overlay · refresh / copy / theme persists / open-in-tab / Esc /
-backdrop click · overlay is 32 px shorter than the page, 90% wide, centered, and follows Safari
+backdrop click · overlay is 32 px shorter than the page, 80% wide, centered, and follows Safari
 window resizes · `t.co` link opens a tab · unreachable host shows the error card after 10 s ·
 overlay works on a strict-CSP host page (e.g. github.com).

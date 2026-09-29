@@ -193,14 +193,14 @@ test("allowsFrame: the host page's frame-src, child-src, then default-src", () =
   );
 });
 
-test("popupBounds: 90% wide, full height less a fixed gap, centered on the browser window", () => {
+test("popupBounds: 80% wide, full height less a fixed gap, centered on the browser window", () => {
   const win = { left: 100, top: 50, width: 1600, height: 1000 };
-  assert.deepEqual(PeekCore.popupBounds(win), { left: 180, top: 114, width: 1440, height: 872 });
+  assert.deepEqual(PeekCore.popupBounds(win), { left: 260, top: 114, width: 1280, height: 872 });
 });
 
 test("popupBounds: no maximum, but a minimum size", () => {
   const huge = PeekCore.popupBounds({ left: 0, top: 0, width: 5000, height: 3000 });
-  assert.deepEqual([huge.width, huge.height], [4500, 2872]);
+  assert.deepEqual([huge.width, huge.height], [4000, 2872]);
   const tiny = PeekCore.popupBounds({ left: 0, top: 0, width: 300, height: 200 });
   assert.deepEqual([tiny.width, tiny.height], [400, 300]);
 });

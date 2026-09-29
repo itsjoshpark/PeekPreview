@@ -91,7 +91,7 @@
 }
 
 /* Window + side buttons, centered. The window follows the browser window's size: full height less
-   a fixed gap, and with the side buttons 90% of the width. */
+   a fixed gap, and with the side buttons 80% of the width. */
 .peek-wrapper {
   display: flex;
   align-items: center;
@@ -104,7 +104,7 @@
   display: flex;
   flex-direction: column;
   /* 58px: the side button column plus the gap beside it. */
-  width: calc(90vw - 58px);
+  width: calc(80vw - 58px);
   height: calc(100vh - 32px);
   background: var(--bg-container);
   border-radius: 12px;
