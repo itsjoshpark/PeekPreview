@@ -256,6 +256,12 @@ button:focus-visible {
   background: transparent;
 }
 
+/* A site framed directly (not via frame.html) gets the white backdrop frame.css gives it, once
+   loaded so the spinner behind it stays visible. */
+.peek-frame-page.peek-frame-loaded {
+  background: #ffffff;
+}
+
 .peek-interacting .peek-frame {
   pointer-events: none;
 }

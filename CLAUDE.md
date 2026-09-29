@@ -41,14 +41,22 @@ scripts/export-icons.sh   # re-render Extension/images/*.png and the app's Icon.
   (`MACOSX_DEPLOYMENT_TARGET` in `Config/Shared.xcconfig`). Don't add checks for older versions.
 - Use the `browser.*` promise API, not `chrome.*` callbacks.
 - Sites whose headers forbid framing (`PeekCore.blocksFraming`) open in a popup window, not the
-  overlay. Don't reintroduce `declarativeNetRequest` header stripping: Safari 27 accepts
-  `modifyHeaders` response-header rules (session or static) but doesn't apply them, and rejects the
-  whole rule if any header name is unrecognised.
+  overlay. The exception is a link on the page's own origin that the site lets that page frame
+  (`PeekCore.allowsParent`: `SAMEORIGIN`, or `frame-ancestors` matching the page, which overrides
+  `X-Frame-Options`) and the page's `<meta>` CSP lets it frame (`PeekCore.allowsFrame`; the
+  header CSP isn't re-fetched): its `<iframe>` goes straight into the shadow root instead of via
+  `frame.html`, sandboxed without `allow-top-navigation`. If it doesn't load, the content script
+  falls back to the popup via `peek:popup`.
+- Don't reintroduce `declarativeNetRequest` header stripping: Safari 27 accepts `modifyHeaders`
+  response-header rules (session or static) but doesn't apply them, and rejects the whole rule if
+  any header name is unrecognised.
 - Safari ignores `width/height/left/top` in `windows.create`, and on a site's first peek resizes
   the popup to fill the screen ~50 ms after it opens. `openPopup` creates it unfocused, re-applies
   the bounds until they hold, then focuses it — keep that sequence.
 - No remote code and no third-party JS libraries (App Store review).
 - All overlay UI lives inside the shadow root; nothing may style or leak into the host page.
+  The one accepted gap: a same-origin in-page frame (and so the host page) can reach the overlay
+  through `frameElement`; they're the same site.
 - The Xcode project uses synchronized folders: new files in `PeekPreview/PeekPreview/`,
   `PeekPreview/PeekPreview Extension/` and the top level of `Extension/` are picked up
   automatically. Xcode flattens synchronized subfolders, so `Extension/lib`, `static`, `images`
@@ -68,8 +76,10 @@ scripts/export-icons.sh   # re-render Extension/images/*.png and the app's Icon.
 
 ## Manual test checklist (Safari)
 
-Shift+Click a link → overlay, not Reading List · github.com / jw.org links open a centered
-peek-sized popup window ·
+Shift+Click a link → overlay, not Reading List · github.com links open a centered peek-sized
+popup window · on a site that sends `X-Frame-Options: SAMEORIGIN`, a same-origin link opens in the
+overlay and a link to another subdomain opens in the popup · on tiktok.com (`frame-ancestors`
+listing `www.tiktok.com`), a same-origin link opens in the overlay ·
 refresh / copy / theme persists / open-in-tab / Esc / backdrop click · drag + all 8 resize handles
 respect 400×300–1400×900 · `t.co` link opens a tab · unreachable host shows the error card after
 10 s · overlay works on a strict-CSP host page (e.g. github.com).

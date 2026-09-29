@@ -65,12 +65,127 @@
   // Would these response headers stop the page rendering in the overlay? `headers` has lower-case keys.
   // The frame's parent is the extension's frame page, never the site itself, so any
   // X-Frame-Options value (DENY or SAMEORIGIN) and any CSP frame-ancestors directive blocks it.
+  // A blocked link on the page's own origin may still be framed in the page (`allowsParent`).
   function blocksFraming(headers) {
     if (headers["x-frame-options"]) return true;
     const csp = headers["content-security-policy"] || "";
     return csp
       .split(";")
       .some((directive) => directive.trim().toLowerCase().startsWith("frame-ancestors"));
+  }
+
+  function parseUrl(value) {
+    try {
+      return new URL(value);
+    } catch {
+      return null;
+    }
+  }
+
+  function isSameOrigin(a, b) {
+    const first = parseUrl(a);
+    const second = parseUrl(b);
+    return first !== null && second !== null && first.origin === second.origin;
+  }
+
+  // CSP header value(s) → one Map(directive → sources) per policy. `fetch` joins repeated headers
+  // with ", ", which is also how several policies are written in one value.
+  function parsePolicies(csp) {
+    return csp
+      .split(",")
+      .map((policy) => {
+        const directives = new Map();
+        for (const directive of policy.split(";")) {
+          const [name, ...sources] = directive.trim().split(/\s+/);
+          const key = name.toLowerCase();
+          if (key && !directives.has(key)) directives.set(key, sources);
+        }
+        return directives;
+      })
+      .filter((directives) => directives.size > 0);
+  }
+
+  // Scheme `to` is allowed by scheme `from`: the same, or an upgrade from http to https.
+  function schemeAllows(from, to) {
+    return from === to || (from === "http:" && to === "https:");
+  }
+
+  const DEFAULT_PORTS = { "http:": "80", "https:": "443" };
+
+  const HOST_SOURCE = /^(?:([a-z][a-z0-9+.-]*):\/\/)?(\*|(?:\*\.)?[^/:*]+)(?::(\d+|\*))?(\/.*)?$/i;
+
+  // Does CSP source expression `source` allow `url`? `selfUrl` is the protected resource ('self').
+  // `ignorePath` for frame-ancestors, where browsers match only the ancestor's origin.
+  function matchesSource(source, url, selfUrl, ignorePath = false) {
+    const target = parseUrl(url);
+    const self = parseUrl(selfUrl);
+    if (!target || !self) return false;
+    const expression = source.toLowerCase();
+
+    if (expression === "*") return target.protocol === "http:" || target.protocol === "https:";
+    if (expression === "'self'") {
+      return target.host === self.host && schemeAllows(self.protocol, target.protocol);
+    }
+    if (/^[a-z][a-z0-9+.-]*:$/.test(expression)) return schemeAllows(expression, target.protocol);
+
+    const match = HOST_SOURCE.exec(source);
+    if (!match) return false;
+    const [, scheme, host, port, path] = match;
+    const from = scheme ? `${scheme.toLowerCase()}:` : self.protocol;
+    if (!schemeAllows(from, target.protocol)) return false;
+
+    const hostname = host.toLowerCase();
+    if (hostname.startsWith("*.")) {
+      if (!target.hostname.endsWith(hostname.slice(1))) return false;
+    } else if (hostname !== "*" && hostname !== target.hostname) {
+      return false;
+    }
+
+    const targetPort = target.port || DEFAULT_PORTS[target.protocol];
+    if (port === undefined ? target.port !== "" : port !== "*" && port !== targetPort) {
+      return false;
+    }
+
+    if (path && !ignorePath) {
+      return path.endsWith("/") ? target.pathname.startsWith(path) : target.pathname === path;
+    }
+    return true;
+  }
+
+  function sourcesAllow(sources, url, selfUrl, ignorePath) {
+    return sources.some((source) => matchesSource(source, url, selfUrl, ignorePath));
+  }
+
+  // Would the site at `url` (after redirects), with these response headers, render in a frame
+  // whose only ancestor is `parentUrl`? CSP frame-ancestors, when present, replaces
+  // X-Frame-Options; conflicting X-Frame-Options values block.
+  function allowsParent(headers, url, parentUrl) {
+    const ancestors = parsePolicies(headers["content-security-policy"] || "")
+      .map((policy) => policy.get("frame-ancestors"))
+      .filter((sources) => sources !== undefined);
+    if (ancestors.length > 0) {
+      return ancestors.every((sources) => sourcesAllow(sources, parentUrl, url, true));
+    }
+
+    const values = new Set(
+      (headers["x-frame-options"] || "")
+        .split(",")
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean)
+    );
+    if (values.size > 1 || values.has("deny")) return false;
+    if (values.has("sameorigin")) return isSameOrigin(url, parentUrl);
+    return true;
+  }
+
+  // Would the page at `pageUrl`, with CSP `csp` (header and <meta> policies), let `url` load in
+  // an <iframe>? Each policy is checked against frame-src, else child-src, else default-src.
+  function allowsFrame(csp, url, pageUrl) {
+    return parsePolicies(csp).every((policy) => {
+      const sources =
+        policy.get("frame-src") ?? policy.get("child-src") ?? policy.get("default-src");
+      return sources === undefined || sourcesAllow(sources, url, pageUrl, false);
+    });
   }
 
   // A peek-sized popup centered on the browser window it was opened from.
@@ -135,6 +250,11 @@
     classifyUrl,
     toFrameUrl,
     blocksFraming,
+    isSameOrigin,
+    parsePolicies,
+    matchesSource,
+    allowsParent,
+    allowsFrame,
     popupBounds,
     sameBounds,
     SIZE_LIMITS,

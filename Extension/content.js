@@ -22,6 +22,20 @@
     "bottom-right": { bottom: true, right: true },
   };
 
+  // Same as frame.js: how long a frame may take before we give up on it.
+  const LOAD_TIMEOUT_MS = 10000;
+  // A same-origin frame could navigate the whole tab (frame-busting); only a click inside it may.
+  const IN_PAGE_SANDBOX = [
+    "allow-same-origin",
+    "allow-scripts",
+    "allow-forms",
+    "allow-popups",
+    "allow-popups-to-escape-sandbox",
+    "allow-modals",
+    "allow-downloads",
+    "allow-top-navigation-by-user-activation",
+  ].join(" ");
+
   const extensionOrigin = new URL(browser.runtime.getURL("")).origin;
   const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -237,7 +251,7 @@
       refreshButton.classList.remove("peek-spin");
       void refreshButton.offsetWidth;
       refreshButton.classList.add("peek-spin");
-      current?.frame?.contentWindow?.postMessage({ type: "peek:refresh" }, extensionOrigin);
+      refreshFrame();
     });
 
     const copyButton = iconButton("peek-header-button", "Copy link", "link", async () => {
@@ -310,16 +324,96 @@
     return { host, shadow, overlay, wrapper, container, body, loading, themeButton, themeMenu };
   }
 
-  function mountFrame(url) {
+  // Frames the site through the extension's frame page, which the host page's CSP can't block.
+  // `inPage` frames it directly instead: a same-origin site that only accepts its own pages as
+  // parents would reject the frame page's origin.
+  function mountFrame(url, inPage) {
     if (!current) return;
-    const frameUrl = new URL(browser.runtime.getURL("frame.html"));
-    frameUrl.searchParams.set("url", PeekCore.toFrameUrl(url));
-    frameUrl.searchParams.set("theme", current.overlay.dataset.theme);
-    const frame = el("iframe", "peek-frame", { src: frameUrl.href, title: url });
+    let src = url;
+    if (!inPage) {
+      const frameUrl = new URL(browser.runtime.getURL("frame.html"));
+      frameUrl.searchParams.set("url", PeekCore.toFrameUrl(url));
+      frameUrl.searchParams.set("theme", current.overlay.dataset.theme);
+      src = frameUrl.href;
+    }
+    const peek = current;
+    const className = inPage ? "peek-frame peek-frame-page" : "peek-frame";
+    const frame = el("iframe", className, { src, title: url });
     frame.setAttribute("allow", "clipboard-write; fullscreen");
-    current.frame = frame;
-    current.body.append(frame);
-    frame.addEventListener("load", () => current?.loading.remove(), { once: true });
+    if (inPage) {
+      frame.setAttribute("sandbox", IN_PAGE_SANDBOX);
+      peek.loadTimer = setTimeout(() => fallBackToPopup(peek), LOAD_TIMEOUT_MS);
+    }
+    peek.frame = frame;
+    peek.inPage = inPage;
+    peek.body.append(frame);
+    frame.addEventListener(
+      "load",
+      () => {
+        if (inPage) {
+          clearTimeout(peek.loadTimer);
+          if (!inPageLoaded(frame)) {
+            fallBackToPopup(peek);
+            return;
+          }
+          frame.classList.add("peek-frame-loaded");
+        }
+        peek.loading.remove();
+      },
+      { once: true }
+    );
+  }
+
+  // Did the same-origin frame load the site? A frame Safari refused holds a blank or error
+  // document, whose location is about:blank or unreadable.
+  function inPageLoaded(frame) {
+    try {
+      return frame.contentWindow.location.href !== "about:blank";
+    } catch {
+      return false;
+    }
+  }
+
+  // The site wouldn't render in the page after all: open it the way a blocked site opens.
+  async function fallBackToPopup(peek) {
+    if (current !== peek || peek.fellBack) return;
+    peek.fellBack = true;
+    clearTimeout(peek.loadTimer);
+    let reply = null;
+    try {
+      reply = await browser.runtime.sendMessage({ type: "peek:popup", url: peek.url });
+    } catch (error) {
+      console.warn("PeekPreview: background unavailable", error);
+    }
+    if (current !== peek) return;
+    if (reply?.mode === "popup") {
+      closePeek();
+    } else {
+      openInTab(peek.url);
+    }
+  }
+
+  function refreshFrame() {
+    const frame = current?.frame;
+    if (!frame) return;
+    if (current.inPage) {
+      // Reloads the frame's current page, even one with a #fragment (a new src would only scroll).
+      try {
+        frame.contentWindow.location.reload();
+      } catch {
+        frame.src = current.url;
+      }
+    } else {
+      frame.contentWindow?.postMessage({ type: "peek:refresh" }, extensionOrigin);
+    }
+  }
+
+  // The page's <meta> CSP, which limits what it may frame; the background checks it before
+  // framing a site in the page.
+  function metaCsp() {
+    return [...document.querySelectorAll('meta[http-equiv="content-security-policy" i]')]
+      .map((meta) => meta.content)
+      .join(", ");
   }
 
   function onFrameMessage(event) {
@@ -340,7 +434,7 @@
     closePeek();
 
     const parts = buildOverlay(url);
-    current = { url, rect: initialRect(), frame: null, ...parts };
+    current = { url, rect: initialRect(), frame: null, inPage: false, ...parts };
     applyRect();
     applyTheme();
     loadStylesheet().then(
@@ -359,14 +453,19 @@
     const peek = current;
     let reply;
     try {
-      reply = await browser.runtime.sendMessage({ type: "peek:open", url, pageUrl: location.href });
+      reply = await browser.runtime.sendMessage({
+        type: "peek:open",
+        url,
+        pageUrl: location.href,
+        pageCsp: metaCsp(),
+      });
     } catch (error) {
       console.warn("PeekPreview: background unavailable", error);
       reply = { mode: "overlay" };
     }
     if (current !== peek) return;
     if (reply?.mode === "overlay") {
-      mountFrame(url);
+      mountFrame(url, reply.inPage === true);
     } else if (reply?.mode === "popup") {
       // The site can't be framed; the background opened it in a popup window instead.
       closePeek();
@@ -382,6 +481,7 @@
 
   function closePeek() {
     if (!current) return;
+    clearTimeout(current.loadTimer);
     current.host.remove();
     current = null;
     window.removeEventListener("message", onFrameMessage);

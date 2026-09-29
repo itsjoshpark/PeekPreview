@@ -80,6 +80,119 @@ test("blocksFraming: any CSP frame-ancestors blocks, other CSP does not", () => 
   assert.equal(PeekCore.blocksFraming(csp("script-src 'self'; frame-src *")), false);
 });
 
+// Trimmed from the live headers (2026-09).
+const GITHUB_CSP =
+  "default-src 'none'; frame-ancestors 'none'; " +
+  "frame-src viewscreen.githubusercontent.com notebooks.githubusercontent.com www.youtube-nocookie.com";
+const TIKTOK_CSP =
+  "upgrade-insecure-requests; default-src 'self' *.tiktok.com; " +
+  "frame-ancestors tea-va.bytedance.net www.tiktok.com; frame-src bytedance: *.kakao.com *.tiktok.com";
+
+test("isSameOrigin: scheme, host and port must all match", () => {
+  assert.equal(PeekCore.isSameOrigin("https://a.com/x", "https://a.com/y?z"), true);
+  assert.equal(PeekCore.isSameOrigin("https://a.com:443/", "https://a.com/"), true);
+  assert.equal(PeekCore.isSameOrigin("http://a.com/", "https://a.com/"), false);
+  assert.equal(PeekCore.isSameOrigin("https://www.a.com/", "https://a.com/"), false);
+  assert.equal(PeekCore.isSameOrigin("https://a.com:8443/", "https://a.com/"), false);
+  assert.equal(PeekCore.isSameOrigin("not a url", "https://a.com/"), false);
+});
+
+test("parsePolicies: splits policies and directives, first duplicate wins", () => {
+  const [one, two] = PeekCore.parsePolicies("Frame-Src a.com b.com; frame-src c.com, default-src 'none'");
+  assert.deepEqual(one.get("frame-src"), ["a.com", "b.com"]);
+  assert.deepEqual(two.get("default-src"), ["'none'"]);
+  assert.deepEqual(PeekCore.parsePolicies(""), []);
+});
+
+test("matchesSource: keywords and scheme sources", () => {
+  const self = "https://site.com/page";
+  assert.equal(PeekCore.matchesSource("*", "https://other.com/", self), true);
+  assert.equal(PeekCore.matchesSource("'self'", "https://site.com/x", self), true);
+  assert.equal(PeekCore.matchesSource("'SELF'", "https://site.com/x", self), true);
+  assert.equal(PeekCore.matchesSource("'self'", "https://www.site.com/", self), false);
+  assert.equal(PeekCore.matchesSource("'self'", "https://site.com/", "http://site.com/"), true);
+  assert.equal(PeekCore.matchesSource("'none'", "https://site.com/", self), false);
+  assert.equal(PeekCore.matchesSource("'unsafe-inline'", "https://site.com/", self), false);
+  assert.equal(PeekCore.matchesSource("https:", "https://other.com/", self), true);
+  assert.equal(PeekCore.matchesSource("http:", "https://other.com/", self), true);
+  assert.equal(PeekCore.matchesSource("bytedance:", "https://other.com/", self), false);
+});
+
+test("matchesSource: host sources with wildcards, schemes, ports and paths", () => {
+  const self = "https://site.com/";
+  assert.equal(PeekCore.matchesSource("*.tiktok.com", "https://www.tiktok.com/@x", self), true);
+  assert.equal(PeekCore.matchesSource("*.tiktok.com", "https://tiktok.com/", self), false);
+  assert.equal(PeekCore.matchesSource("www.tiktok.com", "https://www.tiktok.com/", self), true);
+  assert.equal(PeekCore.matchesSource("WWW.TikTok.com", "https://www.tiktok.com/", self), true);
+  assert.equal(PeekCore.matchesSource("tiktok.com", "https://www.tiktok.com/", self), false);
+  // No scheme: the protected resource's scheme, or an upgrade to https.
+  assert.equal(PeekCore.matchesSource("a.com", "http://a.com/", self), false);
+  assert.equal(PeekCore.matchesSource("a.com", "https://a.com/", "http://site.com/"), true);
+  assert.equal(PeekCore.matchesSource("http://a.com", "https://a.com/", self), true);
+  assert.equal(PeekCore.matchesSource("https://a.com", "http://a.com/", self), false);
+  assert.equal(PeekCore.matchesSource("a.com", "https://a.com:8443/", self), false);
+  assert.equal(PeekCore.matchesSource("a.com:8443", "https://a.com:8443/", self), true);
+  assert.equal(PeekCore.matchesSource("a.com:*", "https://a.com:8443/", self), true);
+  assert.equal(PeekCore.matchesSource("a.com:443", "https://a.com/", self), true);
+  assert.equal(PeekCore.matchesSource("http://a.com:80", "http://a.com/", self), true);
+  assert.equal(PeekCore.matchesSource("a.com:8443", "https://a.com/", self), false);
+  assert.equal(PeekCore.matchesSource("a.com/docs/", "https://a.com/docs/x", self), true);
+  assert.equal(PeekCore.matchesSource("a.com/docs/", "https://a.com/blog", self), false);
+  assert.equal(PeekCore.matchesSource("a.com/docs", "https://a.com/docs/x", self), false);
+  assert.equal(PeekCore.matchesSource("a.com/docs/", "https://a.com/blog", self, true), true);
+});
+
+test("allowsParent: X-Frame-Options", () => {
+  const xfo = (v) => ({ "x-frame-options": v });
+  const url = "https://example.com/a";
+  assert.equal(PeekCore.allowsParent(xfo("SAMEORIGIN"), url, "https://example.com/b"), true);
+  assert.equal(PeekCore.allowsParent(xfo("sameorigin"), url, "https://www.example.com/"), false);
+  assert.equal(PeekCore.allowsParent(xfo("SAMEORIGIN, sameorigin"), url, "https://example.com/"), true);
+  assert.equal(PeekCore.allowsParent(xfo("SAMEORIGIN, DENY"), url, "https://example.com/"), false);
+  assert.equal(PeekCore.allowsParent(xfo("DENY"), url, "https://example.com/"), false);
+  assert.equal(PeekCore.allowsParent(xfo("ALLOWALL"), url, "https://other.com/"), true);
+  assert.equal(PeekCore.allowsParent({}, url, "https://other.com/"), true);
+});
+
+test("allowsParent: frame-ancestors wins over X-Frame-Options", () => {
+  const github = { "x-frame-options": "deny", "content-security-policy": GITHUB_CSP };
+  assert.equal(PeekCore.allowsParent(github, "https://github.com/a", "https://github.com/"), false);
+
+  const tiktok = { "x-frame-options": "SAMEORIGIN", "content-security-policy": TIKTOK_CSP };
+  const video = "https://www.tiktok.com/@x/video/1";
+  assert.equal(PeekCore.allowsParent(tiktok, video, "https://www.tiktok.com/explore"), true);
+  assert.equal(PeekCore.allowsParent(tiktok, video, "https://tiktok.com/"), false);
+  // Not same-origin, but listed: X-Frame-Options is ignored.
+  assert.equal(PeekCore.allowsParent(tiktok, video, "https://tea-va.bytedance.net/"), true);
+
+  const self = { "content-security-policy": "frame-ancestors 'self'" };
+  assert.equal(PeekCore.allowsParent(self, "https://a.com/x", "https://a.com/y/z"), true);
+  assert.equal(PeekCore.allowsParent(self, "https://a.com/x", "https://b.a.com/"), false);
+});
+
+test("allowsParent: every policy with frame-ancestors must allow the parent", () => {
+  const headers = { "content-security-policy": "frame-ancestors *, frame-ancestors 'none'" };
+  assert.equal(PeekCore.allowsParent(headers, "https://a.com/", "https://a.com/"), false);
+});
+
+test("allowsFrame: the host page's frame-src, child-src, then default-src", () => {
+  const page = "https://www.tiktok.com/explore";
+  assert.equal(PeekCore.allowsFrame("", "https://a.com/", "https://a.com/"), true);
+  assert.equal(PeekCore.allowsFrame("script-src 'self'", "https://a.com/", "https://a.com/"), true);
+  assert.equal(PeekCore.allowsFrame(TIKTOK_CSP, "https://www.tiktok.com/@x", page), true);
+  assert.equal(PeekCore.allowsFrame(GITHUB_CSP, "https://github.com/a", "https://github.com/"), false);
+  assert.equal(PeekCore.allowsFrame("default-src 'self'", "https://a.com/x", "https://a.com/"), true);
+  assert.equal(PeekCore.allowsFrame("default-src 'none'", "https://a.com/x", "https://a.com/"), false);
+  assert.equal(
+    PeekCore.allowsFrame("default-src 'none'; child-src 'self'", "https://a.com/x", "https://a.com/"),
+    true
+  );
+  assert.equal(
+    PeekCore.allowsFrame("frame-src 'self', frame-src other.com", "https://a.com/x", "https://a.com/"),
+    false
+  );
+});
+
 test("popupBounds: peek-sized and centered on the browser window", () => {
   const win = { left: 100, top: 50, width: 1600, height: 1000 };
   const b = PeekCore.popupBounds(win);

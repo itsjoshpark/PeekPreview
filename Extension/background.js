@@ -3,9 +3,9 @@
 
 const CHECK_TIMEOUT_MS = 5000;
 
-// Does the site forbid being framed? Reads only the response headers, then aborts the body.
-// Unknown (network error, timeout) counts as "not blocked": the overlay shows its own error card.
-async function isFramingBlocked(url) {
+// `{ headers, url }` for `url` after redirects (`headers` has lower-case keys), or null on a
+// network error or timeout. Reads only the response headers, then aborts the body.
+async function fetchHeaders(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
   try {
@@ -14,13 +14,29 @@ async function isFramingBlocked(url) {
     response.headers.forEach((value, key) => {
       headers[key.toLowerCase()] = value;
     });
-    return PeekCore.blocksFraming(headers);
+    return { headers, url: response.url || url };
   } catch {
-    return false;
+    return null;
   } finally {
     clearTimeout(timer);
     controller.abort();
   }
+}
+
+// A site that blocks the extension's frame page can still go straight into the page's overlay
+// when the link is on the page's own origin (before and after redirects), the site accepts the
+// page as its parent, and the page's <meta> CSP (`pageCsp`) lets it frame the link. The page's
+// header CSP isn't re-fetched: the content script checks that the frame loaded and falls back to
+// the popup (`peek:popup`) if it didn't.
+function canFrameInPage(target, url, pageUrl, pageCsp) {
+  if (!PeekCore.isSameOrigin(url, pageUrl) || !PeekCore.isSameOrigin(target.url, pageUrl)) {
+    return false;
+  }
+  return (
+    PeekCore.allowsParent(target.headers, target.url, pageUrl) &&
+    PeekCore.allowsFrame(pageCsp, url, pageUrl) &&
+    PeekCore.allowsFrame(pageCsp, target.url, pageUrl)
+  );
 }
 
 // How long to watch a new popup: Safari may resize it to fill the screen shortly after it opens
@@ -89,11 +105,20 @@ async function openTab(url, sender) {
 async function handlePeekOpen(message, sender) {
   const mode = PeekCore.classifyUrl(message.url, message.pageUrl);
   if (mode !== "overlay") return { mode };
-  if (!(await isFramingBlocked(message.url))) return { mode: "overlay" };
+  // Unknown headers (network error, timeout) count as framable: the overlay shows its error card.
+  const target = await fetchHeaders(message.url);
+  if (!target || !PeekCore.blocksFraming(target.headers)) return { mode: "overlay" };
+  if (canFrameInPage(target, message.url, message.pageUrl, message.pageCsp || "")) {
+    return { mode: "overlay", inPage: true };
+  }
+  return openOutside(message.url, sender);
+}
 
+// For a site that can't be framed: a popup window, or "tab" to have the content script open a tab.
+async function openOutside(url, sender) {
   if (sender.tab?.windowId !== undefined) {
     try {
-      await openPopup(message.url, sender.tab.windowId);
+      await openPopup(url, sender.tab.windowId);
       return { mode: "popup" };
     } catch (error) {
       console.warn("PeekPreview: could not open popup window", error);
@@ -106,6 +131,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
   switch (message?.type) {
     case "peek:open":
       return handlePeekOpen(message, sender);
+    case "peek:popup":
+      if (PeekCore.classifyUrl(message.url, "") !== "overlay") return undefined;
+      return openOutside(message.url, sender);
     case "peek:openTab":
       return openTab(message.url, sender);
   }
