@@ -34,6 +34,9 @@
 
   position: absolute;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--bg-overlay);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
@@ -81,9 +84,9 @@
   }
 }
 
-/* Window + side buttons, positioned by content.js */
+/* Window + side buttons, centered. The window follows the browser window's size: full height less
+   a fixed gap, and with the side buttons 90% of the width. */
 .peek-wrapper {
-  position: absolute;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -94,11 +97,13 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  /* 66px: the side button column plus the gap beside it. */
+  width: calc(90vw - 66px);
+  height: calc(100vh - 32px);
   background: var(--bg-container);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   overflow: hidden;
-  touch-action: none;
 }
 
 /* Header */
@@ -110,14 +115,8 @@
   flex-shrink: 0;
   background: var(--bg-header);
   border-bottom: 1px solid var(--border-color);
-  cursor: grab;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: none;
-}
-
-.peek-interacting .peek-header {
-  cursor: grabbing;
 }
 
 .peek-header-buttons {
@@ -262,10 +261,6 @@ button:focus-visible {
   background: #ffffff;
 }
 
-.peek-interacting .peek-frame {
-  pointer-events: none;
-}
-
 /* Side buttons */
 .peek-side-buttons {
   display: flex;
@@ -296,52 +291,6 @@ button:focus-visible {
 .peek-side-button:hover {
   background: var(--bg-side-button-hover);
   box-shadow: 0 0 0 6px var(--ring-hover);
-}
-
-/* Resize handles */
-.peek-resize {
-  position: absolute;
-  z-index: 10;
-  touch-action: none;
-}
-
-.peek-resize-top,
-.peek-resize-bottom {
-  left: 12px;
-  right: 12px;
-  height: 6px;
-  cursor: ns-resize;
-}
-
-.peek-resize-top { top: 0; }
-.peek-resize-bottom { bottom: 0; }
-
-.peek-resize-left,
-.peek-resize-right {
-  top: 12px;
-  bottom: 12px;
-  width: 6px;
-  cursor: ew-resize;
-}
-
-.peek-resize-left { left: 0; }
-.peek-resize-right { right: 0; }
-
-.peek-resize-top-left,
-.peek-resize-top-right,
-.peek-resize-bottom-left,
-.peek-resize-bottom-right {
-  width: 12px;
-  height: 12px;
-}
-
-.peek-resize-top-left { top: 0; left: 0; cursor: nwse-resize; }
-.peek-resize-bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
-.peek-resize-top-right { top: 0; right: 0; cursor: nesw-resize; }
-.peek-resize-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
-
-.peek-resize:hover {
-  background: var(--ring);
 }
 
 /* Off-screen field for the execCommand copy fallback */

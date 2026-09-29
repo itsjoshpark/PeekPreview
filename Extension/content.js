@@ -7,20 +7,6 @@
 
   const THEME_KEY = "peek_theme";
   const THEME_LABELS = { auto: "Auto", light: "Light", dark: "Dark" };
-  const SIZE_LIMITS = PeekCore.SIZE_LIMITS;
-  // Width of the side button column plus the gap beside the window.
-  const SIDE_COLUMN = 66;
-  const VIEWPORT_MARGIN = 16;
-  const RESIZE_EDGES = {
-    top: { top: true },
-    right: { right: true },
-    bottom: { bottom: true },
-    left: { left: true },
-    "top-left": { top: true, left: true },
-    "top-right": { top: true, right: true },
-    "bottom-left": { bottom: true, left: true },
-    "bottom-right": { bottom: true, right: true },
-  };
 
   // Same as frame.js: how long a frame may take before we give up on it.
   const LOAD_TIMEOUT_MS = 10000;
@@ -146,81 +132,6 @@
     }
   }
 
-  // --- Geometry ---------------------------------------------------------
-
-  function viewportFor() {
-    return {
-      width: window.innerWidth - SIDE_COLUMN - VIEWPORT_MARGIN * 2,
-      height: window.innerHeight - VIEWPORT_MARGIN * 2,
-    };
-  }
-
-  function initialRect() {
-    const viewport = viewportFor();
-    const size = PeekCore.clampSize(
-      { width: window.innerWidth * 0.9 - SIDE_COLUMN, height: window.innerHeight * 0.9 },
-      SIZE_LIMITS,
-      viewport
-    );
-    return {
-      left: Math.round((window.innerWidth - size.width - SIDE_COLUMN) / 2),
-      top: Math.round((window.innerHeight - size.height) / 2),
-      ...size,
-    };
-  }
-
-  // Keep at least the header reachable when dragging.
-  function clampPosition(rect) {
-    const minVisible = 120;
-    return {
-      ...rect,
-      left: Math.min(Math.max(rect.left, minVisible - rect.width), window.innerWidth - minVisible),
-      top: Math.min(Math.max(rect.top, 0), window.innerHeight - 48),
-    };
-  }
-
-  function applyRect() {
-    const { wrapper, container, rect } = current;
-    wrapper.style.left = `${rect.left}px`;
-    wrapper.style.top = `${rect.top}px`;
-    container.style.width = `${rect.width}px`;
-    container.style.height = `${rect.height}px`;
-  }
-
-  /**
-   * Drag/resize with pointer capture.
-   * @param {HTMLElement} handle
-   * @param {(dx: number, dy: number, startRect: object) => object} onMove Returns the new rect.
-   */
-  function trackPointer(handle, onMove) {
-    handle.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || !current) return;
-      if (event.target.closest("button")) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const peek = current;
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const startRect = { ...peek.rect };
-      handle.setPointerCapture(event.pointerId);
-      peek.overlay.classList.add("peek-interacting");
-
-      const move = (moveEvent) => {
-        peek.rect = onMove(moveEvent.clientX - startX, moveEvent.clientY - startY, startRect);
-        applyRect();
-      };
-      const end = () => {
-        handle.removeEventListener("pointermove", move);
-        handle.removeEventListener("pointerup", end);
-        handle.removeEventListener("pointercancel", end);
-        peek.overlay.classList.remove("peek-interacting");
-      };
-      handle.addEventListener("pointermove", move);
-      handle.addEventListener("pointerup", end);
-      handle.addEventListener("pointercancel", end);
-    });
-  }
-
   // --- Overlay ----------------------------------------------------------
 
   function buildOverlay(url) {
@@ -238,14 +149,6 @@
 
     const wrapper = el("div", "peek-wrapper");
     const container = el("div", "peek-container");
-
-    for (const edge of Object.keys(RESIZE_EDGES)) {
-      const handle = el("div", `peek-resize peek-resize-${edge}`);
-      container.appendChild(handle);
-      trackPointer(handle, (dx, dy, start) =>
-        PeekCore.resizeRect(start, RESIZE_EDGES[edge], dx, dy, SIZE_LIMITS, viewportFor())
-      );
-    }
 
     // Header: refresh, copy, theme, URL.
     const header = el("div", "peek-header");
@@ -288,9 +191,6 @@
     headerButtons.append(refreshButton, copyButton, themeWrap);
     const urlLabel = el("div", "peek-url", { textContent: url, title: url });
     header.append(headerButtons, urlLabel);
-    trackPointer(header, (dx, dy, start) =>
-      clampPosition({ ...start, left: start.left + dx, top: start.top + dy })
-    );
 
     const body = el("div", "peek-body");
     const loading = el("div", "peek-loading");
@@ -310,9 +210,9 @@
     overlay.append(wrapper);
     shadow.append(overlay);
 
-    // Close on a click that starts and ends on the backdrop (not the end of a drag).
+    // Close on a click that starts and ends on the backdrop (not the end of a text selection).
     let downOnBackdrop = false;
-    // Capture phase: drag/resize handles stop propagation, which would leave a stale value.
+    // Capture phase, so nothing inside the overlay can stop it and leave a stale value.
     overlay.addEventListener(
       "pointerdown",
       (event) => {
@@ -325,7 +225,7 @@
       if (downOnBackdrop && event.target === overlay) closePeek();
     });
 
-    return { host, shadow, overlay, wrapper, container, body, loading, themeButton, themeMenu };
+    return { host, shadow, overlay, body, loading, themeButton, themeMenu };
   }
 
   /**
@@ -450,8 +350,7 @@
     closePeek();
 
     const parts = buildOverlay(url);
-    current = { url, rect: initialRect(), frame: null, inPage: false, ...parts };
-    applyRect();
+    current = { url, frame: null, inPage: false, ...parts };
     applyTheme();
     loadStylesheet().then(
       (sheet) => {

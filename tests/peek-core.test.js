@@ -193,17 +193,14 @@ test("allowsFrame: the host page's frame-src, child-src, then default-src", () =
   );
 });
 
-test("popupBounds: peek-sized and centered on the browser window", () => {
+test("popupBounds: 90% wide, full height less a fixed gap, centered on the browser window", () => {
   const win = { left: 100, top: 50, width: 1600, height: 1000 };
-  const b = PeekCore.popupBounds(win);
-  assert.ok(b.width < win.width && b.height < win.height);
-  assert.equal(b.left, win.left + Math.round((win.width - b.width) / 2));
-  assert.equal(b.top, win.top + Math.round((win.height - b.height) / 2));
+  assert.deepEqual(PeekCore.popupBounds(win), { left: 180, top: 114, width: 1440, height: 872 });
 });
 
-test("popupBounds: respects min and max sizes", () => {
+test("popupBounds: no maximum, but a minimum size", () => {
   const huge = PeekCore.popupBounds({ left: 0, top: 0, width: 5000, height: 3000 });
-  assert.deepEqual([huge.width, huge.height], [1400, 900]);
+  assert.deepEqual([huge.width, huge.height], [4500, 2872]);
   const tiny = PeekCore.popupBounds({ left: 0, top: 0, width: 300, height: 200 });
   assert.deepEqual([tiny.width, tiny.height], [400, 300]);
 });
@@ -217,20 +214,13 @@ test("resolveTheme", () => {
   assert.equal(PeekCore.normalizeThemePref("bogus"), "auto");
 });
 
-test("clampSize: respects min, max and viewport", () => {
-  const limits = { minWidth: 400, minHeight: 300, maxWidth: 1400, maxHeight: 900 };
+test("clampSize: respects min and viewport", () => {
+  const min = { width: 400, height: 300 };
   const viewport = { width: 1200, height: 800 };
-  assert.deepEqual(PeekCore.clampSize({ width: 100, height: 100 }, limits, viewport), { width: 400, height: 300 });
-  assert.deepEqual(PeekCore.clampSize({ width: 5000, height: 5000 }, limits, viewport), { width: 1200, height: 800 });
-  assert.deepEqual(PeekCore.clampSize({ width: 600, height: 500 }, limits, viewport), { width: 600, height: 500 });
-});
-
-test("resizeRect: edges move the right sides", () => {
-  const start = { left: 100, top: 100, width: 600, height: 400 };
-  assert.deepEqual(PeekCore.resizeRect(start, { right: true }, 50, 50), { left: 100, top: 100, width: 650, height: 400 });
-  assert.deepEqual(PeekCore.resizeRect(start, { left: true }, 50, 0), { left: 150, top: 100, width: 550, height: 400 });
-  assert.deepEqual(PeekCore.resizeRect(start, { top: true, left: true }, -20, -30), { left: 80, top: 70, width: 620, height: 430 });
-  assert.deepEqual(PeekCore.resizeRect(start, { bottom: true }, 0, 25), { left: 100, top: 100, width: 600, height: 425 });
+  assert.deepEqual(PeekCore.clampSize({ width: 100, height: 100 }, min, viewport), { width: 400, height: 300 });
+  assert.deepEqual(PeekCore.clampSize({ width: 5000, height: 5000 }, min, viewport), { width: 1200, height: 800 });
+  assert.deepEqual(PeekCore.clampSize({ width: 600, height: 500 }, min, viewport), { width: 600, height: 500 });
+  assert.deepEqual(PeekCore.clampSize({ width: 600, height: 500 }, min, { width: 300, height: 200 }), { width: 400, height: 300 });
 });
 
 test("toFrameUrl: upgrades http to https, leaves https alone", () => {
