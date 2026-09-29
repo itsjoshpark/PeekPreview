@@ -5,11 +5,4 @@ Replace this whole file, including this comment. The App Store "What's New" text
 separately in App Store Connect.
 -->
 
-### New
-
-- Links to the same site open in the overlay, instead of a popup window, when the site only allows
-  embedding by its own pages.
-
-### Fixed
-
--
+Initial release.
