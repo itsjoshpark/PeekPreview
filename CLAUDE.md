@@ -11,7 +11,7 @@ macOS Safari Web Extension (MV3) that opens Shift+Clicked links in a peek overla
     `background.js` and `content.js`.
   - `background.js` — header check (overlay vs popup window), `windows.create`, `tabs.create`.
   - `content.js` / `content.css` — link interception and the overlay (closed shadow root,
-    constructed stylesheet, inlined SVG icons, pointer-event drag/resize).
+    constructed stylesheet, inlined SVG icons, CSS-sized to the viewport).
   - `frame.html/js/css` — extension page that hosts the remote `<iframe>` inside the overlay.
 - `PeekPreview/PeekPreview.xcodeproj` — container app (`PeekPreview/`, WKWebView welcome page) and
   `PeekPreview Extension/` target.
@@ -76,10 +76,11 @@ scripts/export-icons.sh   # re-render Extension/images/*.png and the app's Icon.
 
 ## Manual test checklist (Safari)
 
-Shift+Click a link → overlay, not Reading List · github.com links open a centered peek-sized
-popup window · on a site that sends `X-Frame-Options: SAMEORIGIN`, a same-origin link opens in the
-overlay and a link to another subdomain opens in the popup · on tiktok.com (`frame-ancestors`
-listing `www.tiktok.com`), a same-origin link opens in the overlay ·
-refresh / copy / theme persists / open-in-tab / Esc / backdrop click · drag + all 8 resize handles
-respect 400×300–1400×900 · `t.co` link opens a tab · unreachable host shows the error card after
-10 s · overlay works on a strict-CSP host page (e.g. github.com).
+Shift+Click a link → overlay, not Reading List · github.com links open a centered popup window
+90% as wide and 128 px shorter than the Safari window · on a site that sends
+`X-Frame-Options: SAMEORIGIN`, a same-origin link opens in the overlay and a link to another
+subdomain opens in the popup · on tiktok.com (`frame-ancestors` listing `www.tiktok.com`), a
+same-origin link opens in the overlay · refresh / copy / theme persists / open-in-tab / Esc /
+backdrop click · overlay is 32 px shorter than the page, 90% wide, centered, and follows Safari
+window resizes · `t.co` link opens a tab · unreachable host shows the error card after 10 s ·
+overlay works on a strict-CSP host page (e.g. github.com).

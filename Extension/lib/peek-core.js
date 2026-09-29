@@ -6,8 +6,11 @@
   // Short-link hosts that never render usefully in a frame.
   const BLOCKED_HOSTS = ["t.co"];
 
-  // Default peek size, shared by the overlay and the popup window.
-  const SIZE_LIMITS = { minWidth: 400, minHeight: 300, maxWidth: 1400, maxHeight: 900 };
+  // The popup window's size relative to the browser window it opens from: a share of its width,
+  // its full height less a fixed gap (split above and below), and its smallest size.
+  const POPUP_SCALE = 0.9;
+  const POPUP_HEIGHT_GAP = 128;
+  const POPUP_MIN = { width: 400, height: 300 };
 
   const THEMES = ["auto", "light", "dark"];
 
@@ -223,8 +226,8 @@
   // A peek-sized popup centered on the browser window it was opened from.
   function popupBounds(win) {
     const { width, height } = clampSize(
-      { width: win.width * 0.7, height: win.height * 0.8 },
-      SIZE_LIMITS,
+      { width: win.width * POPUP_SCALE, height: win.height - POPUP_HEIGHT_GAP },
+      POPUP_MIN,
       { width: win.width, height: win.height }
     );
     return {
@@ -250,37 +253,19 @@
     return theme;
   }
 
-  function clampSize(size, limits, viewport) {
-    const maxWidth = Math.max(limits.minWidth, Math.min(limits.maxWidth, viewport.width));
-    const maxHeight = Math.max(limits.minHeight, Math.min(limits.maxHeight, viewport.height));
-    return {
-      width: Math.round(Math.min(maxWidth, Math.max(limits.minWidth, size.width))),
-      height: Math.round(Math.min(maxHeight, Math.max(limits.minHeight, size.height))),
-    };
-  }
-
   /**
-   * Resize `start` by pointer delta (dx, dy) along the dragged `edges`.
-   * @param {{ left: number, top: number, width: number, height: number }} start
-   * @param {{ top?: boolean, right?: boolean, bottom?: boolean, left?: boolean }} edges
-   * @param {number} dx
-   * @param {number} dy
-   * @param {object} [limits] With `viewport`, the size is clamped and the opposite edge stays
-   *   anchored.
-   * @param {{ width: number, height: number }} [viewport]
-   * @returns {{ left: number, top: number, width: number, height: number }}
+   * Fit `size` inside `viewport`, but no smaller than `min` (which wins if the viewport is smaller).
+   * @param {{ width: number, height: number }} size
+   * @param {{ width: number, height: number }} min
+   * @param {{ width: number, height: number }} viewport
+   * @returns {{ width: number, height: number }}
    */
-  function resizeRect(start, edges, dx, dy, limits, viewport) {
-    let width = start.width + (edges.right ? dx : 0) - (edges.left ? dx : 0);
-    let height = start.height + (edges.bottom ? dy : 0) - (edges.top ? dy : 0);
-    if (limits && viewport) {
-      ({ width, height } = clampSize({ width, height }, limits, viewport));
-    }
+  function clampSize(size, min, viewport) {
+    const maxWidth = Math.max(min.width, viewport.width);
+    const maxHeight = Math.max(min.height, viewport.height);
     return {
-      left: edges.left ? start.left + start.width - width : start.left,
-      top: edges.top ? start.top + start.height - height : start.top,
-      width,
-      height,
+      width: Math.round(Math.min(maxWidth, Math.max(min.width, size.width))),
+      height: Math.round(Math.min(maxHeight, Math.max(min.height, size.height))),
     };
   }
 
@@ -298,11 +283,12 @@
     allowsFrame,
     popupBounds,
     sameBounds,
-    SIZE_LIMITS,
+    POPUP_SCALE,
+    POPUP_HEIGHT_GAP,
+    POPUP_MIN,
     normalizeThemePref,
     resolveTheme,
     clampSize,
-    resizeRect,
   };
 
   root.PeekCore = PeekCore;

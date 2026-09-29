@@ -13,7 +13,7 @@ Requires **Safari 27** or later (macOS 15 Sequoia or later).
 - Shift+Click (or Shift+middle-click) any link to open it in an overlay.
 - Refresh, copy link, and Auto / Light / Dark theme in the header.
 - Open in a new tab or close (Esc, or click outside) from the side buttons.
-- Drag the window by its header; resize from any edge or corner.
+- The preview nearly fills the window's height, stays centered, and follows the window as you resize it.
 - Sites that forbid embedding (GitHub, many news and login-protected sites) open in a peek-sized
   popup window instead; close it with ⌘W. Sites that only allow embedding by their own pages
   still open in the overlay when you peek a link on the same site.
