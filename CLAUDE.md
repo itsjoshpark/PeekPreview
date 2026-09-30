@@ -13,6 +13,8 @@ macOS Safari Web Extension (MV3) that opens Shift+Clicked links in a peek overla
   - `content.js` / `content.css` — link interception and the overlay (closed shadow root,
     constructed stylesheet, inlined SVG icons, CSS-sized to the viewport).
   - `frame.html/js/css` — extension page that hosts the remote `<iframe>` inside the overlay.
+  - `popup.html/js/css` — toolbar popup: Shift+Click reminder and a per-site on/off switch
+    (`peek_disabled_sites` in `storage.local`, turned-off sites only; see `PeekCore.siteKey`).
 - `PeekPreview/PeekPreview.xcodeproj` — container app (`PeekPreview/`, SwiftUI welcome window) and
   `PeekPreview Extension/` target.
 - `PeekPreview/PeekPreview/AppIcon.icon` — Icon Composer icon.
@@ -83,4 +85,7 @@ subdomain opens in the popup · on tiktok.com (`frame-ancestors` listing `www.ti
 same-origin link opens in the overlay · refresh / copy / theme persists / open-in-tab / Esc /
 backdrop click · overlay is 32 px shorter than the page, 80% wide, centered, and follows Safari
 window resizes · `t.co` link opens a tab · unreachable host shows the error card after 10 s ·
-overlay works on a strict-CSP host page (e.g. github.com).
+overlay works on a strict-CSP host page (e.g. github.com) · toolbar popup shows the reminder and a
+switch for the current site; turned off, Shift+Click adds to Reading List without a reload, and
+turning it back on removes the site from `peek_disabled_sites`; on a Favorites page the switch is
+disabled.

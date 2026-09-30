@@ -15,6 +15,8 @@ Requires **Safari 27** or later (macOS 15 Sequoia or later).
 - Shift+Click (or Shift+middle-click) any link to open it in an overlay.
 - Refresh, copy link, and Auto / Light / Dark theme in the header.
 - Open in a new tab or close (Esc, or click outside) from the side buttons.
+- Turn Shift+Click off for a site from the toolbar button — for web apps that use Shift+Click
+  themselves, or to keep Safari's Add to Reading List there.
 - The preview nearly fills the window's height, stays centered, and follows the window as you resize it.
 - Sites that forbid embedding (GitHub, many news and login-protected sites) open in a peek-sized
   popup window instead; close it with ⌘W. Sites that only allow embedding by their own pages
@@ -35,7 +37,7 @@ Requires **Safari 27** or later (macOS 15 Sequoia or later).
 
 | Path | What |
 | --- | --- |
-| `Extension/` | Web extension source (manifest, background, content script, overlay frame) |
+| `Extension/` | Web extension source (manifest, background, content script, overlay frame, toolbar popup) |
 | `Extension/lib/peek-core.js` | Pure logic shared by the scripts, unit tested |
 | `PeekPreview/` | Xcode project: container app + Safari extension target |
 | `PeekPreview/PeekPreview/AppIcon.icon` | App icon — open in Icon Composer |
@@ -72,7 +74,7 @@ record for `dev.joshuapark.PeekPreview` in App Store Connect. Details are at the
 ## Notes
 
 - Shift+Click normally adds a link to Safari's Reading List; PeekPreview replaces that on links
-  it previews.
+  it previews, except on sites where you turned it off from the toolbar button.
 - Safari doesn't apply `declarativeNetRequest` rules that remove response headers such as
   `X-Frame-Options` (tested on Safari 27), so blocked sites can't be forced into the overlay.
 - Some sites detect being framed with JavaScript or block cookies in third-party frames, so they
