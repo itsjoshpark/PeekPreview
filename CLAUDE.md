@@ -86,6 +86,6 @@ same-origin link opens in the overlay · refresh / copy / theme persists / open-
 backdrop click · overlay is 32 px shorter than the page, 80% wide, centered, and follows Safari
 window resizes · `t.co` link opens a tab · unreachable host shows the error card after 10 s ·
 overlay works on a strict-CSP host page (e.g. github.com) · toolbar popup shows the reminder and a
-switch for the current site; turned off, Shift+Click adds to Reading List without a reload, and
+switch for the current site; turned off, Shift+Click no longer opens a peek (no reload needed), and
 turning it back on removes the site from `peek_disabled_sites`; on a Favorites page the switch is
 disabled.
