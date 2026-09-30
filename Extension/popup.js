@@ -30,7 +30,6 @@
     const enabled = toggle.checked;
     const current = await browser.storage.local.get(SITES_KEY);
     const sites = PeekCore.setSiteDisabled(current[SITES_KEY], site, !enabled);
-    // Only turned-off sites are kept; drop the key once none are left.
     if (sites.length) {
       await browser.storage.local.set({ [SITES_KEY]: sites });
     } else {

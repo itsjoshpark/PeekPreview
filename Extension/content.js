@@ -6,7 +6,6 @@
   window.__peekPreviewLoaded = true;
 
   const THEME_KEY = "peek_theme";
-  // Sites where Shift+Click is turned off from the toolbar popup.
   const SITES_KEY = "peek_disabled_sites";
   const THEME_LABELS = { auto: "Auto", light: "Light", dark: "Dark" };
 
@@ -416,7 +415,6 @@
   // --- Link interception ------------------------------------------------
 
   function onClick(event) {
-    // Turned off here: Shift+Click goes back to Safari (Add to Reading List).
     if (disabledHere || !PeekCore.isPeekTrigger(event)) return;
     const link = PeekCore.findLink(event.composedPath());
     if (!link) return;

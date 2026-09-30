@@ -276,7 +276,6 @@
   }
 
   /**
-   * Only turned-off sites are stored: turning one back on drops its entry.
    * @param {unknown} sites The stored list of turned-off site keys.
    * @param {string} key
    * @param {boolean} disabled
