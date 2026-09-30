@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="color-scheme" content="light dark">
+  <title>PeekPreview</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="title">
+    <img src="images/icon-64.png" alt="" width="32" height="32">
+    <h1>PeekPreview</h1>
+  </header>
+  <p class="tip">Hold <kbd>Shift</kbd> and click any link to preview it.</p>
+  <label class="site">
+    <span class="site-label" id="site-label">Not available on this page</span>
+    <input type="checkbox" role="switch" id="site-toggle" aria-labelledby="site-label" disabled>
+  </label>
+  <script src="lib/peek-core.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

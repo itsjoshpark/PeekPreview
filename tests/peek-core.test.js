@@ -234,3 +234,32 @@ test("sameBounds: equal within a couple of pixels", () => {
   assert.equal(PeekCore.sameBounds(want, { ...want, width: 1345, top: 130 }), true);
   assert.equal(PeekCore.sameBounds(want, { left: 0, top: 25, width: 1920, height: 1055 }), false);
 });
+
+test("siteKey: host without www, null for non-web pages", () => {
+  assert.equal(PeekCore.siteKey("https://www.GitHub.com/a?b=1"), "github.com");
+  assert.equal(PeekCore.siteKey("http://docs.github.com/"), "docs.github.com");
+  assert.equal(PeekCore.siteKey("http://localhost:8080/"), "localhost");
+  assert.equal(PeekCore.siteKey("about:blank"), null);
+  assert.equal(PeekCore.siteKey("safari-web-extension://abc/popup.html"), null);
+  assert.equal(PeekCore.siteKey("not a url"), null);
+});
+
+test("isSiteDisabled: matches the page's site key", () => {
+  const sites = ["github.com"];
+  assert.equal(PeekCore.isSiteDisabled(sites, "https://www.github.com/x"), true);
+  assert.equal(PeekCore.isSiteDisabled(sites, "https://gist.github.com/"), false);
+  assert.equal(PeekCore.isSiteDisabled(sites, "about:blank"), false);
+  assert.equal(PeekCore.isSiteDisabled(undefined, "https://github.com/"), false);
+  assert.equal(PeekCore.isSiteDisabled("github.com", "https://github.com/"), false);
+});
+
+test("setSiteDisabled: adds sorted without duplicates, removes the entry on enable", () => {
+  const sites = ["b.com"];
+  assert.deepEqual(PeekCore.setSiteDisabled(sites, "a.com", true), ["a.com", "b.com"]);
+  assert.deepEqual(PeekCore.setSiteDisabled(sites, "b.com", true), ["b.com"]);
+  assert.deepEqual(PeekCore.setSiteDisabled(sites, "b.com", false), []);
+  assert.deepEqual(PeekCore.setSiteDisabled(sites, "c.com", false), ["b.com"]);
+  assert.deepEqual(sites, ["b.com"]);
+  assert.deepEqual(PeekCore.setSiteDisabled(null, "a.com", true), ["a.com"]);
+  assert.deepEqual(PeekCore.setSiteDisabled(["a.com", 3, "a.com"], "b.com", true), ["a.com", "b.com"]);
+});

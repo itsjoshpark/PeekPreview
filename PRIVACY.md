@@ -1,6 +1,6 @@
 # PeekPreview Privacy Policy
 
-**Last updated:** 2026-09-27
+**Last updated:** 2026-09-30
 
 PeekPreview is a Safari extension that shows a link in an overlay when you Shift+Click it. It runs
 entirely on your Mac and does not collect, store, transmit, or sell any user data.
@@ -9,8 +9,8 @@ entirely on your Mac and does not collect, store, transmit, or sell any user dat
 
 - **None.** PeekPreview does not collect personal information, browsing history, page contents,
   cookies, or identifiers, and has no analytics or telemetry.
-- **Local settings only.** Your theme choice (Auto / Light / Dark) is saved in Safari's extension
-  storage on your Mac.
+- **Local settings only.** Your theme choice (Auto / Light / Dark) and the sites where you turned
+  Shift+Click off (their host names only) are saved in Safari's extension storage on your Mac.
 
 ## Permissions
 
