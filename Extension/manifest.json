@@ -14,6 +14,10 @@
     "256": "images/icon-256.png",
     "512": "images/icon-512.png"
   },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "__MSG_action_title__"
+  },
   "permissions": [
     "storage"
   ],

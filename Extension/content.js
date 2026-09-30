@@ -6,6 +6,8 @@
   window.__peekPreviewLoaded = true;
 
   const THEME_KEY = "peek_theme";
+  // Sites where Shift+Click is turned off from the toolbar popup.
+  const SITES_KEY = "peek_disabled_sites";
   const THEME_LABELS = { auto: "Auto", light: "Light", dark: "Dark" };
 
   // Same as frame.js: how long a frame may take before we give up on it.
@@ -26,12 +28,20 @@
   const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
   let themePref = "auto";
+  let disabledHere = false;
   let current = null;
   let stylesheetPromise = null;
   const iconCache = new Map();
 
-  browser.storage.local.get(THEME_KEY).then((stored) => {
+  browser.storage.local.get([THEME_KEY, SITES_KEY]).then((stored) => {
     themePref = PeekCore.normalizeThemePref(stored[THEME_KEY]);
+    disabledHere = PeekCore.isSiteDisabled(stored[SITES_KEY], location.href);
+  });
+
+  // The popup's toggle applies to open tabs without a reload.
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || !(SITES_KEY in changes)) return;
+    disabledHere = PeekCore.isSiteDisabled(changes[SITES_KEY].newValue, location.href);
   });
 
   darkQuery.addEventListener("change", () => {
@@ -406,7 +416,8 @@
   // --- Link interception ------------------------------------------------
 
   function onClick(event) {
-    if (!PeekCore.isPeekTrigger(event)) return;
+    // Turned off here: Shift+Click goes back to Safari (Add to Reading List).
+    if (disabledHere || !PeekCore.isPeekTrigger(event)) return;
     const link = PeekCore.findLink(event.composedPath());
     if (!link) return;
     const url = PeekCore.linkHref(link);

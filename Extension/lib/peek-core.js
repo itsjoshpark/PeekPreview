@@ -254,6 +254,43 @@
   }
 
   /**
+   * The key a site is turned off under: its host, lower case, without a leading "www.". Other
+   * subdomains are separate sites.
+   * @param {string} url
+   * @returns {string | null} Null for pages that aren't http(s), where peeking never runs.
+   */
+  function siteKey(url) {
+    const parsed = parseUrl(url);
+    if (!parsed || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) return null;
+    return parsed.hostname.toLowerCase().replace(/^www\./, "") || null;
+  }
+
+  /**
+   * @param {unknown} sites The stored list of turned-off site keys.
+   * @param {string} url
+   * @returns {boolean}
+   */
+  function isSiteDisabled(sites, url) {
+    const key = siteKey(url);
+    return key !== null && Array.isArray(sites) && sites.includes(key);
+  }
+
+  /**
+   * Only turned-off sites are stored: turning one back on drops its entry.
+   * @param {unknown} sites The stored list of turned-off site keys.
+   * @param {string} key
+   * @param {boolean} disabled
+   * @returns {string[]} A new sorted list without duplicates.
+   */
+  function setSiteDisabled(sites, key, disabled) {
+    const rest = (Array.isArray(sites) ? sites : []).filter(
+      (site) => typeof site === "string" && site !== key
+    );
+    if (disabled) rest.push(key);
+    return [...new Set(rest)].sort();
+  }
+
+  /**
    * Fit `size` inside `viewport`, but no smaller than `min` (which wins if the viewport is smaller).
    * @param {{ width: number, height: number }} size
    * @param {{ width: number, height: number }} min
@@ -288,6 +325,9 @@
     POPUP_MIN,
     normalizeThemePref,
     resolveTheme,
+    siteKey,
+    isSiteDisabled,
+    setSiteDisabled,
     clampSize,
   };
 
