@@ -1,9 +1,14 @@
+<!--
+Release notes for the next version. The release workflow publishes this file as the GitHub
+release notes, then archives it as release-notes/<version>.md and starts a fresh copy.
+Replace this whole file, including this comment. The App Store "What's New" text is entered
+separately in App Store Connect.
+-->
+
 ### New
 
-- Click the PeekPreview toolbar button for a Shift+Click reminder and a switch that turns
-  previews off for the current site, so Shift+Click works as usual there (for example, Add to
-  Reading List).
+-
 
-### Changed
+### Fixed
 
-- The width of the peek overlay and the popup window is now 80% of the Safari window's width.
+-
