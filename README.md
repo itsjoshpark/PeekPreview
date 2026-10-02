@@ -1,5 +1,5 @@
 <p align="center">
-<img height="256" src="Extension/images/icon-256.png" alt="PeekPreview icon">
+<img height="256" src="Extension/images/icon-512.png" alt="PeekPreview icon">
 </p>
 
 <h1 align="center">PeekPreview</h1>
